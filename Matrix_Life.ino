@@ -18,6 +18,7 @@
 #include <Wire.h>                 // For I2C communication
 #include <Adafruit_LIS3DH.h>      // For accelerometer
 #include <Adafruit_Protomatter.h> // For RGB matrix
+#include <Fonts/Org_01.h>         // 6x6
 
 #define HEIGHT  64  // Matrix height (pixels)
 #define WIDTH   128 // Matrix width (pixels)
@@ -37,6 +38,9 @@ uint8_t oePin      = 14;
 #define NUM_ADDR_PINS 5
 #endif
 
+#define BUTTON_UP 2
+#define BUTTON_DOWN 3
+
 Adafruit_LIS3DH accel = Adafruit_LIS3DH();
 
 Adafruit_Protomatter matrix( WIDTH, 5, 1, 
@@ -46,6 +50,7 @@ Adafruit_Protomatter matrix( WIDTH, 5, 1,
 
 #define BLACK         matrix.color565(  0,  0,  0)
 #define WHITE         matrix.color565(255,255,255)
+#define LIGHT_GREY    matrix.color565( 32, 32, 32)
 #define DARK_GREY     matrix.color565( 16, 16, 16)
 #define BROWN         matrix.color565(120, 79, 23)
 #define RED           matrix.color565(228,  3,  3)
@@ -81,13 +86,13 @@ static const rule rules[] = {         // one rule per current cell state
   BLACK, 0,                           // 0 Dead
   {0, 0, 0, 1, 0, 0, 1, 0, 0},
 
-  DARK_BLUE, 1,                       // 1 Born
+  DARK_BLUE, 1,                       // 1 Birth
   {3, 3, 2, 2, 3, 3, 3, 3, 3},
 
-  GREEN, 1,                           // 2 Survived
+  GREEN, 1,                           // 2 Life
   {3, 3, 2, 2, 3, 3, 3, 3, 3},
 
-  DARK_ORANGE, 0,                     // 3 Dying
+  DARK_ORANGE, 0,                     // 3 Death
   {4, 4, 4, 1, 4, 4, 1, 4, 4},
 
   PETROL_BLUE, 0,                     // 4 Trail
@@ -106,58 +111,56 @@ struct shape {
 
 const shape                           // Seed shape definitions
   GLIDER = {3, 3,       // Gliders
-    " 1 "    
-    "  1"
+    ".1."    
+    "..1"
     "111"},
-
   GLIDER2 = {3, 3,       
-    " 1 "    
-    "1  "
+    ".1."    
+    "1.."
     "111"},
-
   GLIDER3 = {3, 3,
     "111"    
-    "1  "
-    " 1 "},
+    "1.."
+    ".1."},
   GLIDER4 = {3, 3,
     "111"    
-    "  1"
-    " 1 "},
+    "..1"
+    ".1."},
 
   LWSS = {5, 4,         // Light weight space ship
-    "1  1 "
-    "    1"
-    "1   1"
-    " 1111"},
+    "1..1."
+    "....1"
+    "1...1"
+    ".1111"},
 
   MWSS = {6, 5,         // Middle weight space ship
-    "11111 "
-    "1    1"
-    "1     "
-    " 1   1"
-    "   1  "},
+    "11111."
+    "1....1"
+    "1....."
+    ".1...1"
+    "...1.."},
 
   HWSS = {7, 5,         // Heavy weight space ship
-    " 111111"
-    "1     1"
-    "      1"
-    "1    1 "
-    "  11   "},
+    ".111111"
+    "1.....1"
+    "......1"
+    "1....1."
+    "..11..."},
 
   RPENT = {3, 3,       // R-Pentomino
-    " 11"
-    "11 "
-    " 1 "},
+    ".11"
+    "11."
+    ".1."},
 
   DIEHARD = {8, 3,     // Diehard
-    "       1"
-    "11      "
-    " 1   111"},
+    ".......1"
+    "11......"
+    ".1...111"},
 
   ACORN = {7, 3,       // Acorn
-    " 1     "
-    "   1   "
-    "11  111"};
+    ".1....."
+    "...1..."
+    "11..111"};
 
 static const shape *seeds[] = {       // Shape selection list, frequency adjusted for more even random selection
   &GLIDER,
@@ -208,7 +211,8 @@ void setup(void) {
   accel.setRange(LIS3DH_RANGE_4_G);   // 2, 4, 8 or 16 G!
 
   matrix.fillScreen(BLACK);
-  matrix.setTextColor(DARK_GREEN, BLACK);
+  matrix.setFont(&Org_01);
+  matrix.setTextColor(LIGHT_GREY, BLACK);
 
   randomSeed(analogRead(0));
 }
@@ -241,22 +245,22 @@ void loop() {
             + rules[state[now][l][d]].alive + rules[state[now][x][d]].alive + rules[state[now][r][d]].alive;
 
       int ns = rules[s].rule[n];                // new state based on current state and alive neighbours
-      lc += rules[ns].alive;                    // activity accumulator
 
       // Serial.printf(" s %d lrud %d %d %d %d n %d ns %d lc %d\n", s, l, r, u, d, n, ns, lc);
 
       state[next][x][y] = ns;                   // next state update
       matrix.drawPixel(x, y, rules[ns].colour); // display update
+      lc += rules[ns].alive;                    // activity accumulator
     }
   }
 
   if (millis() < 10000) {                       // Banner message for a few seconds
     banner();
-  }
+  };
   matrix.show();
 
-  now ^= 1;                                     // swap now/next 0<->1
-  next ^= 1;
+  now = next;                                   // swap now/next 0<->1
+  next = 1 -next;
 
   if(lc < HEIGHT * WIDTH /25) {                 // Check for low activity and reseed
     seed(1);
@@ -265,14 +269,19 @@ void loop() {
 }
 
 //  Opening banner
+//  Hand crafted background sizes so theres no borners
 //
 void banner() {
-    matrix.setCursor(1, 1);
+    matrix.fillRect(1,1, 59, 5, BLACK);
+    matrix.setCursor(1, 5);
     matrix.print("Game of Life");
-    matrix.setCursor(1, 9);
-    matrix.print("B36/S23");
+
+    matrix.fillRect(1,6, 41, 6, BLACK);
+    matrix.setCursor(1, 11);
+    matrix.print("B36/S23");                    // Game signature - Highlife: birth on 3 & 6, Survival on 2 & 3
   
-    matrix.setCursor(WIDTH-18*6, HEIGHT-8);  
+    matrix.fillRect(WIDTH-90, HEIGHT-6, 89, 5, BLACK);
+    matrix.setCursor(WIDTH-90, HEIGHT-2);  
     matrix.print("R.Lincoln May 2025");
 }
 
@@ -284,12 +293,11 @@ void seed(int n) {
     int px = random(10, WIDTH -10);             // random screen position
     int py = random(10, HEIGHT -10);
 
-    int s = random(seedsC);                     // random seed matrix
-    const shape *seed = seeds[s];
+    const shape *seed = seeds[random(seedsC)];  // random seed matrix
 
-    for(int y=0, i=0; y <seed->height; y++) {   // copy any 1s onto the matrix
+    for(int y=0, i=0; y <seed->height; y++) {   // copy onto the matrix
       for(int x=0; x <seed->width; x++, i++) {
-        if(seed->shape[i] == '1') {
+        if(seed->shape[i] != '.') {
           state[now][px+x][py+y] = 2;
         }
       }
