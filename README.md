@@ -10,6 +10,6 @@ Table driven initial set pieces
 
 Colour enhanced
 
-Blue = birth, Green = life, Orange = dying, Petrol-Blue = trails
+Blue = birth, Green = life, Orange = death, Petrol-Blue = trails
 
 ![Screenshot 2025-05-15 at 09 46 09](https://github.com/user-attachments/assets/8dc49c3b-cdf5-4f6b-88a2-bed34a4aeff8)
