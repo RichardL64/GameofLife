@@ -1,5 +1,5 @@
 # GameofLife
-Game of life for Matrix LED and Adafruit Matrix Portal S3
+Conway's Game of life for Matrix LED and Adafruit Matrix Portal S3
 
 Arduino
 Adafruit Protomatter and GFX libraries
