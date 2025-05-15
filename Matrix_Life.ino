@@ -68,51 +68,44 @@ int state[2][WIDTH][HEIGHT];
 int now = 0, next = 1;
 
 //  Cellular autometa definition https://en.wikipedia.org/wiki/Life-like_cellular_automaton
+//  Lookup table - current state and neighbours in gives new state out
 //
-static const int rules[6][9] = {      // Transitions - row = current state, col = number of neighbours, cell = next state
+struct rule {
+  int colour;                         // representative colour for this state
+  int alive;                          // 1 if alive for accumulating neighbour count
+  int rule[9];                        // Next state/rule number indexed/selected by number of live neighbours
+};
+
 // 0  1  2  3  4  5  6  7  8          // Neighbour count
-  {0, 0, 0, 2, 0, 0, 2, 0, 0},        // 0 Dead
-  {5, 5, 5, 2, 5, 5, 2, 5, 5},        // 1 Dying
-  {1, 1, 3, 3, 1, 1, 1, 1, 1},        // 2 Born
-  {1, 1, 3, 3, 1, 1, 1, 1, 1},        // 3 Survived
+static const rule rules[] = {         // one rule per current cell state
+  BLACK, 0,                           // 0 Dead
+  {0, 0, 0, 1, 0, 0, 1, 0, 0},
 
-  {1, 1, 3, 3, 1, 1, 1, 1, 1},        // 4 Born + Random factor
-  {5, 5, 0, 2, 0, 0, 2, 0, 0}         // 5 Trail (55xxxxx = trail)
+  DARK_BLUE, 1,                       // 1 Born
+  {3, 3, 2, 2, 3, 3, 3, 3, 3},
 
+  GREEN, 1,                           // 2 Survived
+  {3, 3, 2, 2, 3, 3, 3, 3, 3},
+
+  DARK_ORANGE, 0,                     // 3 Dying
+  {4, 4, 4, 1, 4, 4, 1, 4, 4},
+
+  PETROL_BLUE, 0,                     // 4 Trail
+  {4, 4, 0, 1, 0, 0, 1, 0, 0}
 };
-
-static const int alive[6] = {         // which states get counted as neighbours
-  0,
-  0,
-  1,
-  1,
-
-  1,
-  0
-};
-
-static const int colours[] = {        // Colours to draw for each state
-  BLACK,                              // 0 Dead
-  DARK_ORANGE,                        // 1 Dying
-  DARK_BLUE,                          // 2 Born
-  GREEN,                              // 3 Survived
-
-  DARK_BLUE,                          // 4 Born + Random factor
-  PETROL_BLUE                         // 5 Trail
-};
+// 0  1  2  3  4  5  6  7  8
 
 
 // Set peices from https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life
 // Used by seed to setup the game
 //
-
 struct shape {
   int   width, height;
   char  shape[];
 };
 
-const shape                           // Unique shape definitions
-  GLIDER = {3, 3,
+const shape                           // Seed shape definitions
+  GLIDER = {3, 3,       // Gliders
     " 1 "    
     "  1"
     "111"},
@@ -243,18 +236,17 @@ void loop() {
       u = (y==0)        ? HEIGHT-1 : y-1;
       d = (y==HEIGHT-1) ? 0        : y+1;
 
-      int n = alive[state[now][l][u]] + alive[state[now][x][u]] + alive[state[now][r][u]]
-            + alive[state[now][l][y]]                           + alive[state[now][r][y]]
-            + alive[state[now][l][d]] + alive[state[now][x][d]] + alive[state[now][r][d]];
+      int n = rules[state[now][l][u]].alive + rules[state[now][x][u]].alive + rules[state[now][r][u]].alive
+            + rules[state[now][l][y]].alive                                 + rules[state[now][r][y]].alive
+            + rules[state[now][l][d]].alive + rules[state[now][x][d]].alive + rules[state[now][r][d]].alive;
 
-      int ns = rules[s][n];                     // lookup the new state based on current and neighbours
-      if(ns==4 && random(1000) < 998) ns=s;     // State 4 only sticks with small random chance
-      lc += alive[ns];                          // Activity accumulator
+      int ns = rules[s].rule[n];                // new state based on current state and alive neighbours
+      lc += rules[ns].alive;                    // activity accumulator
 
       // Serial.printf(" s %d lrud %d %d %d %d n %d ns %d lc %d\n", s, l, r, u, d, n, ns, lc);
 
       state[next][x][y] = ns;                   // next state update
-      matrix.drawPixel(x, y, colours[ns]);      // display update
+      matrix.drawPixel(x, y, rules[ns].colour); // display update
     }
   }
 
@@ -266,7 +258,7 @@ void loop() {
   now ^= 1;                                     // swap now/next 0<->1
   next ^= 1;
 
-  if(lc < HEIGHT * WIDTH / 25) {                // Check for low activity and reseed
+  if(lc < HEIGHT * WIDTH /25) {                 // Check for low activity and reseed
     seed(1);
   }
   // Serial.println("done");
